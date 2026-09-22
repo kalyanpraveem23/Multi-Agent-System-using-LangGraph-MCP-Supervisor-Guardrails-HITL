@@ -1,600 +1,299 @@
-const API_BASE = "http://localhost:8000";
+let currentThreadId = localStorage.getItem("travel_thread_id") || null;
+let latestAnswerMarkdown = "";
+let waitingForApproval = false;
 
-let currentThreadId = null;
+const AGENT_LABELS = {
+  flight_agent: "✈️ Flight Agent",
+  hotel_agent: "🏨 Hotel Agent",
+  weather_agent: "🌦️ Weather Agent",
+  budget_agent: "💰 Budget Agent",
+  itinerary_agent: "🗓️ Itinerary Agent"
+};
 
-
-/* =====================================================
-   Example prompt
-===================================================== */
-
-function useExample(text) {
-
-    document.getElementById("travelQuery").value = text;
-
+function setPrompt(text) {
+  document.getElementById("userInput").value = text;
 }
 
+function setLoading(isLoading, mode = "draft") {
+  const sendBtn = document.getElementById("sendBtn");
+  const btnText = document.getElementById("btnText");
+  const btnLoader = document.getElementById("btnLoader");
+  const approveBtn = document.getElementById("approveBtn");
+  const reviseBtn = document.getElementById("reviseBtn");
 
-/* =====================================================
-   Start trip planning
-===================================================== */
+  sendBtn.disabled = isLoading;
+  approveBtn.disabled = isLoading;
+  reviseBtn.disabled = isLoading;
 
-async function planTrip() {
-
-    const input = document.getElementById("travelQuery");
-    const button = document.getElementById("planBtn");
-
-    const query = input.value.trim();
-
-    if (!query) {
-
-        alert("Please enter your travel request.");
-
-        return;
-    }
-
-
-    // UI
-    button.disabled = true;
-
-    document.getElementById("emptyState")
-        .classList.add("hidden");
-
-    document.getElementById("results")
-        .classList.add("hidden");
-
-    document.getElementById("loading")
-        .classList.remove("hidden");
-
-
-    try {
-
-        /*
-         * Backend endpoint expected:
-         *
-         * POST /api/travel
-         *
-         * {
-         *     "user_input": "Plan a trip to Delhi"
-         * }
-         */
-
-        const response = await fetch(
-            `${API_BASE}/api/travel`,
-            {
-                method: "POST",
-
-                headers: {
-                    "Content-Type": "application/json"
-                },
-
-                body: JSON.stringify({
-                    user_input: query
-                })
-            }
-        );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                `Server error: ${response.status}`
-            );
-
-        }
-
-
-        const data = await response.json();
-
-
-        currentThreadId = data.thread_id;
-
-
-        displayResults(data);
-
-
-    } catch (error) {
-
-        console.error(error);
-
-        alert(
-            "Unable to connect to TripMate backend.\n\n" +
-            error.message
-        );
-
-    } finally {
-
-        button.disabled = false;
-
-        document.getElementById("loading")
-            .classList.add("hidden");
-    }
+  if (isLoading && mode === "draft") {
+    btnText.classList.add("hidden");
+    btnLoader.classList.remove("hidden");
+  } else {
+    btnText.classList.remove("hidden");
+    btnLoader.classList.add("hidden");
+  }
 }
 
+function showError(message) {
+  const errorBox = document.getElementById("errorBox");
+  errorBox.textContent = message;
+  errorBox.classList.remove("hidden");
+  errorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+}
 
-/* =====================================================
-   Display backend response
-===================================================== */
+function hideError() {
+  const errorBox = document.getElementById("errorBox");
+  errorBox.classList.add("hidden");
+  errorBox.textContent = "";
+}
 
-function displayResults(data) {
+function renderMarkdown(element, markdown) {
+  if (typeof marked !== "undefined") {
+    element.innerHTML = marked.parse(markdown || "");
+  } else {
+    element.innerText = markdown || "";
+  }
+}
 
-    document.getElementById("results")
-        .classList.remove("hidden");
+function showWorkflow(data) {
+  const section = document.getElementById("workflowSection");
+  const reasoning = document.getElementById("supervisorReasoning");
+  const chips = document.getElementById("agentChips");
+  const guardrailBadge = document.getElementById("guardrailBadge");
 
+  reasoning.textContent = data.supervisor_reasoning || "Supervisor routing completed.";
+  chips.innerHTML = "";
 
-    // -----------------------------
-    // Header
-    // -----------------------------
+  (data.selected_agents || []).forEach((agent) => {
+    const chip = document.createElement("span");
+    chip.className = "agent-chip";
+    chip.textContent = AGENT_LABELS[agent] || agent;
+    chips.appendChild(chip);
+  });
 
-    const constraints =
-        data.trip_constraints || {};
+  if (data.guardrail_allowed === false) {
+    guardrailBadge.textContent = "Guardrail blocked";
+    guardrailBadge.classList.add("blocked");
+  } else {
+    guardrailBadge.textContent = "Guardrail passed";
+    guardrailBadge.classList.remove("blocked");
+  }
 
-    const destination =
-        constraints.destination || "Travel Plan";
+  section.classList.remove("hidden");
+}
 
-    document.getElementById("resultTitle")
-        .textContent = destination;
+function showResult(answer, threadId, isDraft = false) {
+  latestAnswerMarkdown = answer || "";
 
+  const resultSection = document.getElementById("resultSection");
+  const resultBox = document.getElementById("resultBox");
+  const threadInfo = document.getElementById("threadInfo");
+  const resultTitle = document.getElementById("resultTitle");
 
-    // -----------------------------
-    // Agents
-    // -----------------------------
+  renderMarkdown(resultBox, latestAnswerMarkdown);
+  threadInfo.textContent = `Thread ID: ${threadId}`;
+  resultTitle.textContent = isDraft ? "Draft Travel Plan" : "Your Final AI Travel Plan";
+  resultSection.classList.remove("hidden");
 
-    displayAgents(
-        data.selected_agents || []
-    );
+  resultSection.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
 
+function showApproval(data) {
+  waitingForApproval = true;
+  const section = document.getElementById("approvalSection");
+  const approvalRequest = document.getElementById("approvalRequest");
+  approvalRequest.textContent = data.approval_request ||
+    "Approve the draft or provide feedback before the final plan is generated.";
+  section.classList.remove("hidden");
+}
 
-    // -----------------------------
-    // Constraints
-    // -----------------------------
+function hideApproval() {
+  waitingForApproval = false;
+  document.getElementById("approvalSection").classList.add("hidden");
+  document.getElementById("approvalFeedback").value = "";
+}
 
-    displayConstraints(
-        constraints
-    );
+async function sendMessage() {
+  hideError();
 
+  if (waitingForApproval) {
+    showError("Please approve or revise the current draft before starting another plan.");
+    return;
+  }
 
-    // -----------------------------
-    // Agent results
-    // -----------------------------
+  const input = document.getElementById("userInput");
+  const message = input.value.trim();
 
-    document.getElementById("flightContent")
-        .textContent =
-        data.flight_results ||
-        "Flight agent was not selected.";
+  if (!message) {
+    showError("Please enter your travel request first.");
+    return;
+  }
 
+  setLoading(true, "draft");
 
-    document.getElementById("hotelContent")
-        .textContent =
-        data.hotel_results ||
-        "Hotel agent was not selected.";
+  try {
+    const response = await fetch("/api/travel", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: message,
+        thread_id: currentThreadId
+      })
+    });
 
+    const data = await response.json();
 
-    document.getElementById("weatherContent")
-        .textContent =
-        data.weather_results ||
-        "Weather agent was not selected.";
-
-
-    document.getElementById("budgetContent")
-        .textContent =
-        data.budget_results ||
-        "Budget agent was not selected.";
-
-
-    document.getElementById("itineraryContent")
-        .textContent =
-        data.itinerary ||
-        "Itinerary is not available yet.";
-
-
-    // -----------------------------
-    // Supervisor
-    // -----------------------------
-
-    document.getElementById("reasoning")
-        .textContent =
-        data.supervisor_reasoning ||
-        "No supervisor reasoning available.";
-
-
-    // -----------------------------
-    // Statistics
-    // -----------------------------
-
-    document.getElementById("threadId")
-        .textContent =
-        data.thread_id || "-";
-
-
-    document.getElementById("llmCalls")
-        .textContent =
-        data.llm_calls ?? 0;
-
-
-    // -----------------------------
-    // Guardrail
-    // -----------------------------
-
-    if (data.guardrail_allowed === false) {
-
-        showBlocked(data);
-
-        return;
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Something went wrong.");
     }
 
+    currentThreadId = data.thread_id;
+    localStorage.setItem("travel_thread_id", currentThreadId);
 
-    // -----------------------------
-    // HITL
-    // -----------------------------
+    showWorkflow(data);
 
     if (data.requires_approval) {
-
-        showApproval(data);
-
+      showResult(data.itinerary || data.answer, data.thread_id, true);
+      showApproval(data);
     } else {
-
-        showFinalResponse(data);
+      hideApproval();
+      showResult(data.answer, data.thread_id, false);
     }
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    setLoading(false, "draft");
+  }
 }
 
+async function submitApproval(approved) {
+  hideError();
 
-/* =====================================================
-   Display selected agents
-===================================================== */
+  if (!currentThreadId || !waitingForApproval) {
+    showError("There is no draft waiting for approval.");
+    return;
+  }
 
-function displayAgents(agents) {
+  const feedbackInput = document.getElementById("approvalFeedback");
+  const feedback = feedbackInput.value.trim();
 
-    const container =
-        document.getElementById("agents");
+  if (!approved && !feedback) {
+    showError("Please enter revision feedback before requesting changes.");
+    feedbackInput.focus();
+    return;
+  }
 
-    container.innerHTML = "";
+  setLoading(true, "approval");
 
+  try {
+    const response = await fetch("/api/travel/approve", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        thread_id: currentThreadId,
+        approved: approved,
+        feedback: feedback
+      })
+    });
 
-    if (!agents.length) {
+    const data = await response.json();
 
-        container.innerHTML =
-            `<span class="agent">
-                No specialist agents selected
-            </span>`;
-
-        return;
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Could not resume the travel workflow.");
     }
 
+    showWorkflow(data);
+    hideApproval();
+    showResult(data.answer, data.thread_id, false);
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    setLoading(false, "approval");
+  }
+}
 
-    agents.forEach(agent => {
+function copyResult() {
+  const resultBox = document.getElementById("resultBox");
+  const text = resultBox.innerText;
 
-        const element =
-            document.createElement("span");
+  if (!text) {
+    return;
+  }
 
-        element.className = "agent";
+  navigator.clipboard.writeText(text)
+    .then(() => {
+      const copyBtn = document.querySelector(".copy-btn");
+      const oldText = copyBtn.textContent;
+      copyBtn.textContent = "Copied!";
 
-        element.textContent =
-            formatAgentName(agent);
-
-        container.appendChild(element);
-
+      setTimeout(() => {
+        copyBtn.textContent = oldText;
+      }, 1400);
+    })
+    .catch(() => {
+      showError("Could not copy result.");
     });
 }
 
+function downloadPDF() {
+  const pdfContent = document.getElementById("pdfContent");
 
-/* =====================================================
-   Format agent name
-===================================================== */
+  if (!latestAnswerMarkdown || !pdfContent) {
+    showError("No travel plan available to download.");
+    return;
+  }
 
-function formatAgentName(agent) {
+  const downloadBtn = document.querySelector(".download-btn");
+  const oldText = downloadBtn.textContent;
+  downloadBtn.textContent = "Preparing PDF...";
+  downloadBtn.disabled = true;
 
-    return agent
-        .replace("_agent", "")
-        .replaceAll("_", " ")
-        .replace(/\b\w/g, char =>
-            char.toUpperCase()
-        );
-}
-
-
-/* =====================================================
-   Display constraints
-===================================================== */
-
-function displayConstraints(constraints) {
-
-    const container =
-        document.getElementById("constraints");
-
-    container.innerHTML = "";
-
-
-    const fields = {
-
-        destination: "Destination",
-
-        origin: "Origin",
-
-        duration: "Duration",
-
-        budget: "Budget",
-
-        travel_style: "Travel Style",
-
-        special_preferences: "Preferences"
-
-    };
-
-
-    Object.entries(fields).forEach(
-        ([key, label]) => {
-
-            let value =
-                constraints[key];
-
-
-            if (
-                Array.isArray(value)
-            ) {
-
-                value =
-                    value.length
-                        ? value.join(", ")
-                        : "None";
-
-            }
-
-
-            if (!value) {
-
-                value = "Not specified";
-
-            }
-
-
-            const item =
-                document.createElement("div");
-
-            item.className =
-                "constraint";
-
-
-            item.innerHTML = `
-                <span>${label}</span>
-                <strong>${escapeHtml(String(value))}</strong>
-            `;
-
-
-            container.appendChild(item);
-
-        }
-    );
-}
-
-
-/* =====================================================
-   Human approval
-===================================================== */
-
-function showApproval(data) {
-
-    const approvalBox =
-        document.getElementById("approvalBox");
-
-    approvalBox.classList.remove("hidden");
-
-
-    document.getElementById("approvalRequest")
-        .textContent =
-        data.approval_request ||
-        "Please review the itinerary.";
-
-
-    document.getElementById("approvalStatus")
-        .textContent =
-        "Waiting for Approval";
-
-
-    document.getElementById("systemStatus")
-        .textContent =
-        "Waiting for human review";
-
-
-    document.getElementById("finalBox")
-        .classList.add("hidden");
-}
-
-
-/* =====================================================
-   Submit human approval
-===================================================== */
-
-async function submitApproval(approved) {
-
-    if (!currentThreadId) {
-
-        alert("Thread ID is missing.");
-
-        return;
+  const options = {
+    margin: 0.5,
+    filename: "ai-travel-plan.pdf",
+    image: {
+      type: "jpeg",
+      quality: 0.98
+    },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff"
+    },
+    jsPDF: {
+      unit: "in",
+      format: "a4",
+      orientation: "portrait"
+    },
+    pagebreak: {
+      mode: ["avoid-all", "css", "legacy"]
     }
+  };
 
-
-    const feedback =
-        document.getElementById("feedback")
-            .value
-            .trim();
-
-
-    try {
-
-        /*
-         * Backend endpoint expected:
-         *
-         * POST /api/approve
-         *
-         * {
-         *     "thread_id": "...",
-         *     "approved": true,
-         *     "feedback": "..."
-         * }
-         */
-
-
-        const response = await fetch(
-            `${API_BASE}/api/approve`,
-            {
-                method: "POST",
-
-                headers: {
-                    "Content-Type": "application/json"
-                },
-
-                body: JSON.stringify({
-
-                    thread_id:
-                        currentThreadId,
-
-                    approved:
-                        approved,
-
-                    feedback:
-                        feedback
-
-                })
-            }
-        );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                `Approval failed: ${response.status}`
-            );
-        }
-
-
-        const data =
-            await response.json();
-
-
-        // Hide approval UI
-
-        document.getElementById("approvalBox")
-            .classList.add("hidden");
-
-
-        // Update results
-
-        displayResults(data);
-
-
-    } catch (error) {
-
-        console.error(error);
-
-        alert(
-            "Unable to submit approval.\n\n" +
-            error.message
-        );
-    }
+  html2pdf()
+    .set(options)
+    .from(pdfContent)
+    .save()
+    .then(() => {
+      downloadBtn.textContent = oldText;
+      downloadBtn.disabled = false;
+    })
+    .catch(() => {
+      downloadBtn.textContent = oldText;
+      downloadBtn.disabled = false;
+      showError("Could not download PDF.");
+    });
 }
 
-
-/* =====================================================
-   Final response
-===================================================== */
-
-function showFinalResponse(data) {
-
-    document.getElementById("approvalBox")
-        .classList.add("hidden");
-
-
-    document.getElementById("finalBox")
-        .classList.remove("hidden");
-
-
-    document.getElementById("finalResponse")
-        .textContent =
-        data.answer ||
-        data.final_response ||
-        "Travel plan completed.";
-
-
-    document.getElementById("approvalStatus")
-        .textContent =
-        data.approved
-            ? "Approved"
-            : "Completed";
-
-
-    document.getElementById("systemStatus")
-        .textContent =
-        "Completed";
-}
-
-
-/* =====================================================
-   Guardrail blocked
-===================================================== */
-
-function showBlocked(data) {
-
-    document.getElementById("approvalBox")
-        .classList.add("hidden");
-
-
-    document.getElementById("finalBox")
-        .classList.remove("hidden");
-
-
-    document.getElementById("finalResponse")
-        .textContent =
-        data.guardrail_reason ||
-        data.answer ||
-        "This request was blocked.";
-
-
-    document.getElementById("approvalStatus")
-        .textContent =
-        "Blocked";
-
-
-    document.getElementById("systemStatus")
-        .textContent =
-        "Guardrail blocked";
-}
-
-
-/* =====================================================
-   Toggle result sections
-===================================================== */
-
-function toggleSection(id) {
-
-    const element =
-        document.getElementById(id);
-
-
-    if (
-        element.style.display === "none"
-    ) {
-
-        element.style.display = "block";
-
-    } else {
-
-        element.style.display = "none";
-
-    }
-}
-
-
-/* =====================================================
-   Basic HTML escaping
-===================================================== */
-
-function escapeHtml(value) {
-
-    return value
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
+document.addEventListener("keydown", function(event) {
+  if (event.ctrlKey && event.key === "Enter") {
+    sendMessage();
+  }
+});

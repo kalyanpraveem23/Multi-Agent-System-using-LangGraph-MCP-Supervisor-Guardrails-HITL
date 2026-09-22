@@ -1,383 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>TripMate AI</title>
-
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TripMate AI</title>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
-
 <body>
-
-    <div class="app">
-
-        <!-- ================= HEADER ================= -->
-        <header class="topbar">
-            <div class="brand">
-                <div class="logo">✈</div>
-                <div>
-                    <h1>TripMate AI</h1>
-                    <p>Multi-Agent Travel Planner</p>
-                </div>
-            </div>
-
-            <div class="status">
-                <span class="status-dot"></span>
-                AI Online
-            </div>
-        </header>
-
-
-        <!-- ================= MAIN ================= -->
-        <main class="main-container">
-
-            <!-- LEFT: CHAT / INPUT -->
-            <section class="chat-panel">
-
-                <div class="welcome">
-                    <span class="welcome-icon">🌍</span>
-
-                    <h2>Plan your next trip</h2>
-
-                    <p>
-                        Tell TripMate AI where you want to go,
-                        your budget, duration and preferences.
-                    </p>
-                </div>
-
-
-                <!-- Example prompts -->
-                <div class="examples">
-
-                    <button class="example-btn"
-                            onclick="useExample('Plan a 5 day trip from Chennai to Delhi with a budget of ₹30,000')">
-                        🏛️ Chennai → Delhi
-                    </button>
-
-                    <button class="example-btn"
-                            onclick="useExample('Find hotels and weather information for Bangalore')">
-                        🏨 Bangalore Hotels
-                    </button>
-
-                    <button class="example-btn"
-                            onclick="useExample('Plan a budget trip to Goa for 4 days')">
-                        🌴 Goa Budget Trip
-                    </button>
-
-                </div>
-
-
-                <!-- User input -->
-                <div class="input-area">
-
-                    <textarea
-                        id="travelQuery"
-                        placeholder="Example: Plan a 5-day trip from Chennai to Delhi with a ₹30,000 budget..."
-                    ></textarea>
-
-                    <button id="planBtn" onclick="planTrip()">
-                        <span>Plan My Trip</span>
-                        <span>➜</span>
-                    </button>
-
-                </div>
-
-            </section>
-
-
-            <!-- RIGHT: RESULTS -->
-            <section class="result-panel">
-
-                <!-- Loading -->
-                <div id="loading" class="loading hidden">
-                    <div class="spinner"></div>
-
-                    <h3>Planning your trip...</h3>
-
-                    <p>
-                        Supervisor is selecting the required travel agents.
-                    </p>
-                </div>
-
-
-                <!-- Initial empty state -->
-                <div id="emptyState" class="empty-state">
-
-                    <div class="empty-icon">🧳</div>
-
-                    <h2>Your travel plan will appear here</h2>
-
-                    <p>
-                        Start by entering your destination and travel requirements.
-                    </p>
-
-                </div>
-
-
-                <!-- Results -->
-                <div id="results" class="results hidden">
-
-                    <!-- Trip summary -->
-                    <div class="result-header">
-
-                        <div>
-                            <span class="label">TRIP PLAN</span>
-                            <h2 id="resultTitle">Your Trip</h2>
-                        </div>
-
-                        <span id="approvalStatus"
-                              class="badge">
-                            Processing
-                        </span>
-
-                    </div>
-
-
-                    <!-- Selected agents -->
-                    <div class="card">
-
-                        <div class="card-title">
-                            <span>🤖</span>
-                            <h3>Agents Used</h3>
-                        </div>
-
-                        <div id="agents" class="agent-list"></div>
-
-                    </div>
-
-
-                    <!-- Trip constraints -->
-                    <div class="card">
-
-                        <div class="card-title">
-                            <span>📋</span>
-                            <h3>Trip Details</h3>
-                        </div>
-
-                        <div id="constraints"
-                             class="constraints-grid">
-                        </div>
-
-                    </div>
-
-
-                    <!-- Agent results -->
-                    <div class="agent-results">
-
-                        <!-- Flights -->
-                        <div class="result-card">
-
-                            <button class="result-heading"
-                                    onclick="toggleSection('flightContent')">
-
-                                <span>
-                                    ✈️
-                                    <strong>Flight Information</strong>
-                                </span>
-
-                                <span>⌄</span>
-
-                            </button>
-
-                            <div id="flightContent"
-                                 class="result-content">
-                                No flight information yet.
-                            </div>
-
-                        </div>
-
-
-                        <!-- Hotels -->
-                        <div class="result-card">
-
-                            <button class="result-heading"
-                                    onclick="toggleSection('hotelContent')">
-
-                                <span>
-                                    🏨
-                                    <strong>Hotel Suggestions</strong>
-                                </span>
-
-                                <span>⌄</span>
-
-                            </button>
-
-                            <div id="hotelContent"
-                                 class="result-content">
-                                No hotel information yet.
-                            </div>
-
-                        </div>
-
-
-                        <!-- Weather -->
-                        <div class="result-card">
-
-                            <button class="result-heading"
-                                    onclick="toggleSection('weatherContent')">
-
-                                <span>
-                                    🌤️
-                                    <strong>Weather Information</strong>
-                                </span>
-
-                                <span>⌄</span>
-
-                            </button>
-
-                            <div id="weatherContent"
-                                 class="result-content">
-                                No weather information yet.
-                            </div>
-
-                        </div>
-
-
-                        <!-- Budget -->
-                        <div class="result-card">
-
-                            <button class="result-heading"
-                                    onclick="toggleSection('budgetContent')">
-
-                                <span>
-                                    💰
-                                    <strong>Budget Analysis</strong>
-                                </span>
-
-                                <span>⌄</span>
-
-                            </button>
-
-                            <div id="budgetContent"
-                                 class="result-content">
-                                No budget analysis yet.
-                            </div>
-
-                        </div>
-
-
-                        <!-- Itinerary -->
-                        <div class="result-card itinerary-card">
-
-                            <div class="itinerary-heading">
-                                <span>🗺️</span>
-
-                                <div>
-                                    <strong>Day-by-Day Itinerary</strong>
-                                    <p>Generated by TripMate AI</p>
-                                </div>
-                            </div>
-
-                            <div id="itineraryContent"
-                                 class="itinerary-content">
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- Supervisor reasoning -->
-                    <div class="card reasoning-card">
-
-                        <div class="card-title">
-                            <span>🧠</span>
-                            <h3>Supervisor Decision</h3>
-                        </div>
-
-                        <p id="reasoning"></p>
-
-                    </div>
-
-
-                    <!-- Human approval -->
-                    <div id="approvalBox"
-                         class="approval-box hidden">
-
-                        <div class="approval-icon">
-                            👤
-                        </div>
-
-                        <div class="approval-info">
-
-                            <h3>Human Review Required</h3>
-
-                            <p id="approvalRequest">
-                                Please review the itinerary.
-                            </p>
-
-                            <textarea
-                                id="feedback"
-                                placeholder="Optional: request changes to the itinerary..."
-                            ></textarea>
-
-                            <div class="approval-buttons">
-
-                                <button
-                                    class="approve-btn"
-                                    onclick="submitApproval(true)">
-                                    ✓ Approve Plan
-                                </button>
-
-                                <button
-                                    class="revision-btn"
-                                    onclick="submitApproval(false)">
-                                    ↻ Request Revision
-                                </button>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- Final response -->
-                    <div id="finalBox"
-                         class="final-box hidden">
-
-                        <div class="final-title">
-                            <span>✨</span>
-                            <h3>Final Travel Plan</h3>
-                        </div>
-
-                        <div id="finalResponse"></div>
-
-                    </div>
-
-
-                    <!-- Statistics -->
-                    <div class="stats">
-
-                        <div>
-                            <span>Thread</span>
-                            <strong id="threadId">-</strong>
-                        </div>
-
-                        <div>
-                            <span>LLM Calls</span>
-                            <strong id="llmCalls">0</strong>
-                        </div>
-
-                        <div>
-                            <span>Status</span>
-                            <strong id="systemStatus">Ready</strong>
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-        </main>
-
-    </div>
-
-
-    <script src="script.js"></script>
-
+  <div class="page-bg">
+    <div class="gradient-circle circle-1"></div>
+    <div class="gradient-circle circle-2"></div>
+    <div class="gradient-circle circle-3"></div>
+  </div>
+
+  <main class="app-container">
+    <section class="hero-section">
+      <div class="badge">
+        ✈️ TripMate AI — LangGraph, MCP, Supervisor, Guardrails & HITL
+      </div>
+      <h1>Plan Your Perfect Trip with AI</h1>
+      <p>
+        Search flights, discover hotels, check weather, assess your budget,
+        and review the AI-generated draft before the final itinerary is created.
+      </p>
+    </section>
+
+    <section class="planner-card">
+      <div class="card-header">
+        <div>
+          <h2>Where do you want to go?</h2>
+          <p>
+            Example: Plan a complete 7 days Japan trip from Bangladesh under 2 lakhs.
+          </p>
+        </div>
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          Online
+        </div>
+      </div>
+
+      <div class="input-area">
+        <textarea
+          id="userInput"
+          placeholder="Plan a complete 7 days Japan trip including flights, hotels and sightseeing under 2 lakhs..."
+        ></textarea>
+        <button id="sendBtn" onclick="sendMessage()">
+          <span id="btnText">Generate Draft</span>
+          <span id="btnLoader" class="loader hidden"></span>
+        </button>
+      </div>
+
+      <div class="quick-prompts">
+        <button onclick="setPrompt('Plan a complete 7 days Japan trip from Bangladesh including flights, hotels and sightseeing under 2 lakhs.')">
+          Japan Trip
+        </button>
+        <button onclick="setPrompt('Plan a 5 days Dubai trip from Dhaka with flights, hotels and sightseeing.')">
+          Dubai Trip
+        </button>
+        <button onclick="setPrompt('Plan a 7 days Thailand trip from Bangladesh with budget hotels and sightseeing.')">
+          Thailand Trip
+        </button>
+        <button onclick="setPrompt('Give me all country flight info.')">
+          Global Flights
+        </button>
+      </div>
+    </section>
+
+    <section id="workflowSection" class="workflow-section hidden">
+      <div class="workflow-header">
+        <div>
+          <span class="eyebrow">Supervisor Agent</span>
+          <h2>Execution Plan</h2>
+        </div>
+        <span id="guardrailBadge" class="guardrail-badge">Guardrail passed</span>
+      </div>
+      <p id="supervisorReasoning" class="supervisor-reasoning"></p>
+      <div id="agentChips" class="agent-chips"></div>
+    </section>
+
+    <section id="resultSection" class="result-section hidden">
+      <div class="result-header">
+        <div>
+          <h2 id="resultTitle">Your AI Travel Plan</h2>
+          <p id="threadInfo">Thread ID: -</p>
+        </div>
+        <div class="result-actions">
+          <button class="copy-btn" onclick="copyResult()">Copy</button>
+          <button class="download-btn" onclick="downloadPDF()">Download PDF</button>
+        </div>
+      </div>
+
+      <div id="pdfContent" class="pdf-content">
+        <h1 class="pdf-title">AI Travel Plan</h1>
+        <div id="resultBox" class="result-box"></div>
+      </div>
+    </section>
+
+    <section id="approvalSection" class="approval-section hidden">
+      <div class="approval-icon">👤</div>
+      <div class="approval-content">
+        <span class="eyebrow">Human-in-the-Loop</span>
+        <h2>Review the draft itinerary</h2>
+        <p id="approvalRequest">
+          Approve the draft or provide feedback before the final plan is generated.
+        </p>
+
+        <textarea
+          id="approvalFeedback"
+          class="feedback-input"
+          placeholder="Add revision feedback, for example: reduce the hotel cost and add one free day..."
+        ></textarea>
+
+        <div class="approval-actions">
+          <button id="approveBtn" class="approve-btn" onclick="submitApproval(true)">
+            Approve & Generate Final
+          </button>
+          <button id="reviseBtn" class="revise-btn" onclick="submitApproval(false)">
+            Revise Using Feedback
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="errorBox" class="error-box hidden"></section>
+  </main>
+
+  <footer>
+    Built with FastAPI, LangGraph, Groq, PostgreSQL, Tavily, AviationStack and MCP
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="/static/script.js"></script>
 </body>
 </html>
